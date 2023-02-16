@@ -132,6 +132,126 @@ WAS(sendError 호출 기록 확인) <- 필터 <- 서블릿 <- 인터셉터 <- �
 
 ## 서블릿 예외 처리 - 오류 화면 제공
 
+서블릿 컨테이너가 제공하는 기본 예외 처리 화면은 고객 친화적이지 않다.
+서블릿이 제공하는 오류 화면 기능을 사용해보자.
+
+서블릿은 `Exception`(예외)가 발생해서 서블릿 밖으로 전달되거나
+또는 `response.sendError()`가 호출되었을 때 각각의 상황에 맞춘 오류 처리 기능을 제공한다.
+
+이 기능을 사용하면 친절한 오류 처리 화면을 준비해서 고객에게 보여줄 수 있다.
+
+### 서블릿 오류 페이지 등록
+
+```java
+@Component
+public class WebServerCustomizer
+        implements WebServerFactoryCustomizer<ConfigurableWebServerFactory> {
+    @Override
+    public void customize(
+            ConfigurableWebServerFactory factory
+    ) {
+        ErrorPage errorPage404 = new ErrorPage(HttpStatus.NOT_FOUND, "/error-page/404");
+        ErrorPage errorPage500 = new ErrorPage(HttpStatus.INTERNAL_SERVER_ERROR, "/error-page/500");
+        ErrorPage errorPageEx = new ErrorPage(RuntimeException.class, "/error-page/500");
+
+        factory.addErrorPages(errorPage404, errorPage500, errorPageEx);
+    }
+}
+```
+
+* `response.sendError(404)`: errorPage404 호출
+* `response.sendError(500)`: errorPage500 호출
+* `RuntimeException`또는 그 자식 타입의 예외: errorPageEx 호출
+
+500 예외가 서버 내부에서 발생한 오류라는 뜻을 포함하고 있기 때문에 여기서는 예외가 발생한 경우도 500 오류 화면으로 처리했다.
+
+오류 페이지는 예외를 다룰 때 해당 예외와 그 자식 타입의 오류를 함께 처리한다.
+예를 들어서 위의 경우 `RuntimeException`은 물론이고 `RuntimeException`의 자식도 함께 처리한다.
+
+오류가 발생했을 때 처리할 수 있는 컨트롤러가 필요하다.
+예를 들어서 `RuntimeException`예외가 발생하면 `errorPageEx`에서 지정한 `/error-page/500`이 호출된다.
+
+### ErrorPageController
+
+```java
+@Slf4j
+@Controller
+@RequestMapping("/error-page")
+public class ErrorPageController {
+    @RequestMapping("/404")
+    public String errorPage404(
+            HttpServletRequest req,
+            HttpServletResponse resp
+    ) {
+        log.info("GET /error-page/404");
+        return "error-page/404";
+    }
+
+    @RequestMapping("/500")
+    public String errorPage500(
+            HttpServletRequest req,
+            HttpServletResponse resp
+    ) {
+        log.info("GET /error-page/500");
+        return "error-page/500";
+    }
+}
+```
+
+### View
+
+#### error-page/404.html
+
+```html
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body>
+<div class="container" style="max-width: 600px">
+    <div class="py-5 text-center">
+        <h2>404 오류 화면</h2>
+    </div>
+    <div>
+        <p>오류 화면 입니다.</p>
+    </div>
+    <hr class="my-4">
+</div> <!-- /container -->
+</body>
+</html>
+```
+
+#### error-page/500.html
+
+```html
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body>
+<div class="container" style="max-width: 600px">
+    <div class="py-5 text-center">
+        <h2>500 오류 화면</h2>
+    </div>
+    <div>
+        <p>오류 화면 입니다.</p>
+    </div>
+    <hr class="my-4">
+</div> <!-- /container -->
+</body>
+</html>
+```
+
+### 실행 결과
+
+![img_2.png](img_2.png)
+
+![img_3.png](img_3.png)
+
+![img_4.png](img_4.png)
+
 ## 서블릿 예외 처리 - 오류 페이지 작동 원리
 
 ## 서블릿 예외 처리 - 필터

@@ -1,4 +1,4 @@
-package hello.springcoremvc28.exception;
+package hello.springcoremvc28.servlet;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;

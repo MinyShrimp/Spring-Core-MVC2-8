@@ -14,7 +14,9 @@ public class ApiExceptionController {
             @PathVariable String id
     ) {
         if (id.equals("ex")) {
-            throw new RuntimeException("잘 못 된 사용자");
+            throw new RuntimeException("잘못된 사용자");
+        } else if (id.equals("bad")) {
+            throw new IllegalArgumentException("잘못된 입력 값");
         }
         return new MemberDto(id, "hello " + id);
     }

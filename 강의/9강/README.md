@@ -588,6 +588,229 @@ RuntimeException resolver to 500
 
 ## HandlerExceptionResolver 활용
 
+### 예외를 여기서 마무리하기
+
+예외가 발생하면 WAS까지 예외가 던져지고, WAS에서 오류 페이지 정보를 찾아서 다시 `/error`를 호출하는 과정은 생각해보면 너무 복잡하다.
+`ExceptionResolver`를 활용하면 예외가 발생했을 때 이런 복잡한 과정 없이 여기에서 문제를 깔끔하게 해결할 수 있다.
+
+### UserException
+
+```java
+public class UserException extends RuntimeException {
+    public UserException(String message) {
+        super(message);
+    }
+}
+```
+
+### ApiExceptionController - 추가
+
+```java
+@Slf4j
+@RestController
+public class ApiExceptionController {
+    @GetMapping("/api/members/{id}")
+    public MemberDto getMember(
+            @PathVariable String id
+    ) {
+        if (id.equals("ex")) {
+            throw new RuntimeException("잘못된 사용자");
+        } else if (id.equals("bad")) {
+            throw new IllegalArgumentException("잘못된 입력 값");
+        } else if (id.equals("user-ex")) {
+            throw new UserException("사용자 오류");
+        }
+        return new MemberDto(id, "hello " + id);
+    }
+}
+```
+
+### 결과
+
+#### Client
+
+![img_8.png](img_8.png)
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/members/user-ex
+Accept-Header: */*
+
+###################################
+# RESPONSE
+###################################
+{
+    "timestamp": "2023-02-17T07:59:43.984+00:00",
+    "status": 500,
+    "error": "Internal Server Error",
+    "exception": "hello.springcoremvc28.exception.UserException",
+    "path": "/api/members/user-ex"
+}
+```
+
+#### Server Log
+
+```
+###################################
+# GET /api/members/user-ex
+###################################
+[/api/members/user-ex][REQUEST][d6f0cfd6-367e-4dea-b68a-71a62ccddf7b] LogFilter doFilter - START
+[/api/members/user-ex][REQUEST][d6f0cfd6-367e-4dea-b68a-71a62ccddf7b] LogInterceptor preHandle - handler [hello.springcoremvc28.api.ApiExceptionController#getMember(String)]
+RuntimeException resolver to 500
+[/api/members/user-ex][REQUEST][d6f0cfd6-367e-4dea-b68a-71a62ccddf7b] LogInterceptor afterCompletion
+[/api/members/user-ex][REQUEST][d6f0cfd6-367e-4dea-b68a-71a62ccddf7b] LogFilter doFilter - END
+
+###################################
+# /error
+###################################
+[/error][ERROR][60772377-5191-41d0-9a65-bcd5aa2e20ea] LogFilter doFilter - START
+[/error][ERROR][60772377-5191-41d0-9a65-bcd5aa2e20ea] LogFilter doFilter - END
+```
+
+이제 이 예외를 처리하는 `UserHandlerExceptionResolver`를 만들어보자
+
+### UserHandlerExceptionResolver
+
+```java
+@Slf4j
+public class UserHandlerExceptionResolver implements HandlerExceptionResolver {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Override
+    public ModelAndView resolveException(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Object handler,
+            Exception ex
+    ) {
+        try {
+            if (ex instanceof UserException) {
+                log.info("UserException resolver to 400");
+
+                String acceptHeader = request.getHeader("accept");
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+
+                // Accept-Header = application/json
+                if ("application/json".equals(acceptHeader)) {
+                    Map<String, Object> errorResult = new HashMap<>();
+                    errorResult.put("ex", ex.getClass());
+                    errorResult.put("message", ex.getMessage());
+
+                    // 객체 -> 문자열
+                    String result = objectMapper.writeValueAsString(errorResult);
+                    log.info("result = {}", result);
+
+                    // 보낼 문자열 담기
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("utf-8");
+                    response.getWriter().write(result);
+
+                    return new ModelAndView();
+                } else {
+                    return new ModelAndView("error/500");
+                }
+            }
+        } catch (Exception e) {
+            log.error("resolver ex: [{}]", e.toString());
+        }
+        return null;
+    }
+}
+```
+
+### ResolverConfig - 추가
+
+```java
+@Configuration
+public class ResolverConfig implements WebMvcConfigurer {
+    @Override
+    public void extendHandlerExceptionResolvers(
+            List<HandlerExceptionResolver> resolvers
+    ) {
+        resolvers.add(new UserHandlerExceptionResolver()); // 순서 주의 !!!
+        resolvers.add(new MyHandlerExceptionResolver());
+    }
+}
+```
+
+### 결과 1 - Json
+
+#### Client
+
+![img_9.png](img_9.png)
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/members/user-ex
+Accept-Header: application/json
+
+###################################
+# RESPONSE
+###################################
+{
+    "ex": "hello.springcoremvc28.exception.UserException",
+    "message": "사용자 오류"
+}
+```
+
+#### Server Log
+
+```
+###################################
+# GET /api/members/user-ex
+###################################
+[/api/members/user-ex][REQUEST][fcac1451-966f-46e5-80a9-014a0b22f8d5] LogFilter doFilter - START
+[/api/members/user-ex][REQUEST][fcac1451-966f-46e5-80a9-014a0b22f8d5] LogInterceptor preHandle - handler [hello.springcoremvc28.api.ApiExceptionController#getMember(String)]
+UserException resolver to 400
+result = {"ex":"hello.springcoremvc28.exception.UserException","message":"사용자 오류"}
+[/api/members/user-ex][REQUEST][fcac1451-966f-46e5-80a9-014a0b22f8d5] LogInterceptor afterCompletion
+[/api/members/user-ex][REQUEST][fcac1451-966f-46e5-80a9-014a0b22f8d5] LogFilter doFilter - END
+```
+
+### 결과 2 - 브라우저
+
+#### Client
+
+![img_10.png](img_10.png)
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/members/user-ex
+Accept-Header: text/html
+
+###################################
+# RESPONSE
+###################################
+< src/main/resources/templates/error/500.html >
+```
+
+#### Server Log
+
+```
+###################################
+# GET /api/members/user-ex
+###################################
+[/api/members/user-ex][REQUEST][7cc4acf5-8c3f-4ed5-a1c4-d5df9067fefd] LogFilter doFilter - START
+[/api/members/user-ex][REQUEST][7cc4acf5-8c3f-4ed5-a1c4-d5df9067fefd] LogInterceptor preHandle - handler [hello.springcoremvc28.api.ApiExceptionController#getMember(String)]
+UserException resolver to 400
+[/api/members/user-ex][REQUEST][7cc4acf5-8c3f-4ed5-a1c4-d5df9067fefd] LogInterceptor afterCompletion
+[/api/members/user-ex][REQUEST][7cc4acf5-8c3f-4ed5-a1c4-d5df9067fefd] LogFilter doFilter - END
+```
+
+### 정리
+
+* `ExceptionResolver`를 사용하면 컨트롤러에서 예외가 발생해도 `ExceptionResolver`에서 예외를 처리해버린다.
+* 따라서 예외가 발생해도 서블릿 컨테이너까지 예외가 전달되지 않고, 스프링 MVC에서 예외 처리는 끝이 난다.
+* 결과적으로 WAS 입장에서는 정상 처리가 된 것이다. 이렇게 **예외를 이곳에서 모두 처리할 수 있다는 것**이 핵심이다.
+* 서블릿 컨테이너까지 예외가 올라가면 복잡하고 지저분하게 추가 프로세스가 실행된다. 반면에 `ExceptionResolver`를 사용하면 예외처리가 상당히 깔끔해진다.
+* 그런데 직접 `ExceptionResolver`를 구현하려고 하니 상당히 복잡하다. 지금부터 스프링이 제공하는 `ExceptionResolver`들을 알아보자.
+
 ## 스프링이 제공하는 ExceptionResolver 1
 
 ## 스프링이 제공하는 ExceptionResolver 2

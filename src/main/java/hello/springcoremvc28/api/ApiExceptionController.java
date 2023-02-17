@@ -1,6 +1,7 @@
 package hello.springcoremvc28.api;
 
 import hello.springcoremvc28.dto.MemberDto;
+import hello.springcoremvc28.exception.UserException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +18,8 @@ public class ApiExceptionController {
             throw new RuntimeException("잘못된 사용자");
         } else if (id.equals("bad")) {
             throw new IllegalArgumentException("잘못된 입력 값");
+        } else if (id.equals("user-ex")) {
+            throw new UserException("사용자 오류");
         }
         return new MemberDto(id, "hello " + id);
     }

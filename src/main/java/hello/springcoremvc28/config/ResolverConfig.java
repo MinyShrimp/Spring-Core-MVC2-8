@@ -1,6 +1,7 @@
 package hello.springcoremvc28.config;
 
 import hello.springcoremvc28.resolver.MyHandlerExceptionResolver;
+import hello.springcoremvc28.resolver.UserHandlerExceptionResolver;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -13,6 +14,7 @@ public class ResolverConfig implements WebMvcConfigurer {
     public void extendHandlerExceptionResolvers(
             List<HandlerExceptionResolver> resolvers
     ) {
+        resolvers.add(new UserHandlerExceptionResolver());
         resolvers.add(new MyHandlerExceptionResolver());
     }
 }

@@ -13,10 +13,10 @@
 
 * 프로젝트 생성
 * 서블릿 예외 처리 - 시작
-* 서블릿 예외 처리 - 오류 화면 제공
-* 서블릿 예외 처리 - 오류 페이지 작동 원리
-* 서블릿 예외 처리 - 필터
-* 서블릿 예외 처피 - 인터셉터
-* 스프링 부트 - 오류 페이지 1
-* 스프링 부트 - 오류 페이지 2
-* 정리
+* 서블릿 예외 처리 - 오류 화면 제공 - WebServerFactoryCustomizer
+* 서블릿 예외 처리 - 오류 페이지 작동 원리 - RequestDispatcher
+* 서블릿 예외 처리 - 필터 - DispatcherType
+* 서블릿 예외 처피 - 인터셉터 - LogInterceptor
+* 스프링 부트 - 오류 페이지 1 - BasicErrorController
+* 스프링 부트 - 오류 페이지 2 - properties
+* 추가 정리 - BasicErrorController

@@ -573,6 +573,141 @@ public @interface WebFilter {
 
 ## 서블릿 예외 처피 - 인터셉터
 
+### LogInterceptor
+
+```java
+@Slf4j
+public class LogInterceptor implements HandlerInterceptor {
+    @Override
+    public boolean preHandle(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Object handler
+    ) throws Exception {
+        String uuid = (String) request.getAttribute(Consts.logId);
+        String requestURI = request.getRequestURI();
+        DispatcherType dispatcherType = request.getDispatcherType();
+
+        log.info("[{}][{}][{}] LogInterceptor preHandle - handler [{}]", requestURI, dispatcherType, uuid, handler);
+
+        return true;
+    }
+
+    @Override
+    public void postHandle(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Object handler,
+            ModelAndView modelAndView
+    ) throws Exception {
+        String uuid = (String) request.getAttribute(Consts.logId);
+        String requestURI = request.getRequestURI();
+        DispatcherType dispatcherType = request.getDispatcherType();
+
+        log.info("[{}][{}][{}] LogInterceptor postHandle - modelAndView [{}]", requestURI, dispatcherType, uuid, modelAndView);
+    }
+
+    @Override
+    public void afterCompletion(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Object handler,
+            Exception ex
+    ) throws Exception {
+        String uuid = (String) request.getAttribute(Consts.logId);
+        String requestURI = request.getRequestURI();
+        DispatcherType dispatcherType = request.getDispatcherType();
+
+        log.info("[{}][{}][{}] LogInterceptor afterCompletion", requestURI, dispatcherType, uuid);
+        if (ex != null) {
+            log.error("[{}][{}][{}] LogInterceptor afterCompletion Error!!", requestURI, dispatcherType, uuid, ex);
+        }
+    }
+}
+```
+
+앞서 필터의 경우에는 필터를 등록할 때 어떤 `DispatcherType`인 경우에 필터를 적용할 지 선택할 수 있었다.
+그런데 인터셉터는 서블릿이 제공하는 기능이 아니라 스프링이 제공하는 기능이다.
+따라서 `DispatcherType`과 무관하게 항상 호출된다.
+
+대신에 인터셉터는 다음과 같이 요청 경로에 따라서 추가하거나 제외하기 쉽게 되어 있기 때문에,
+이러한 설정을 사용해서 오류 페이지 경로를 `excludePathPatterns`를 사용해서 빼주면 된다.
+
+### InterceptorConfig
+
+```java
+@Configuration
+public class InterceptorConfig implements WebMvcConfigurer {
+    @Override
+    public void addInterceptors(
+            InterceptorRegistry registry
+    ) {
+        registry.addInterceptor(new LogInterceptor())
+                .order(1)
+                .addPathPatterns("/**")
+                .excludePathPatterns(
+                        "/css/**", "*.ico", "/error"
+                );
+    }
+}
+```
+
+### 결과
+
+#### 정상 요청
+
+```
+// 클라이언트 요청: GET /hello
+// 응답: 200 OK "hello !"
+[/hello][REQUEST][df8fdc33-4488-465c-b8fa-6921cf4dfd3a] LogFilter doFilter - START
+[/hello][REQUEST][df8fdc33-4488-465c-b8fa-6921cf4dfd3a] LogInterceptor preHandle - handler [hello.springcoremvc28.servlet.ServletExController#hello()]
+[/hello][REQUEST][df8fdc33-4488-465c-b8fa-6921cf4dfd3a] LogInterceptor postHandle - modelAndView [null]
+[/hello][REQUEST][df8fdc33-4488-465c-b8fa-6921cf4dfd3a] LogInterceptor afterCompletion
+[/hello][REQUEST][df8fdc33-4488-465c-b8fa-6921cf4dfd3a] LogFilter doFilter - END
+```
+
+#### 흐름
+
+```
+WAS(/hello, dispatchType=REQUEST) -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러 -> View
+```
+
+#### 오류 요청
+
+```
+// 클라이언트 요청: GET /error-ex
+[/error-ex][REQUEST][9a3ff35b-4b75-44f7-b38e-f7d0ca6eb7cd] LogFilter doFilter - START
+[/error-ex][REQUEST][9a3ff35b-4b75-44f7-b38e-f7d0ca6eb7cd] LogInterceptor preHandle - handler [hello.springcoremvc28.servlet.ServletExController#errorEx()]
+[/error-ex][REQUEST][9a3ff35b-4b75-44f7-b38e-f7d0ca6eb7cd] LogInterceptor afterCompletion
+[/error-ex][REQUEST][9a3ff35b-4b75-44f7-b38e-f7d0ca6eb7cd] LogInterceptor afterCompletion Error!!
+java.lang.RuntimeException: 예외 발생!
+[/error-ex][REQUEST][9a3ff35b-4b75-44f7-b38e-f7d0ca6eb7cd] LogFilter doFilter - END
+
+// 에러 발생 - 500 (throw new RuntimeException("예외 발생!"))
+[/error-page/500][ERROR][0a01796d-84c8-451b-998c-ef06e6a3a314] LogFilter doFilter - START
+[/error-page/500][ERROR][0a01796d-84c8-451b-998c-ef06e6a3a314] LogInterceptor preHandle - handler [hello.springcoremvc28.servlet.ErrorPageController#errorPage500(HttpServletRequest, HttpServletResponse)]
+GET /error-page/500
+ERROR_EXCEPTION: [java.lang.RuntimeException: 예외 발생!]
+ERROR_EXCEPTION_TYPE: [class java.lang.RuntimeException]
+ERROR_MESSAGE: [Request processing failed: java.lang.RuntimeException: 예외 발생!]
+ERROR_REQUEST_URI: [/error-ex]
+ERROR_SERVLET_NAME: [dispatcherServlet]
+ERROR_STATUS_CODE: [500]
+dispatcherType: [ERROR]
+[/error-page/500][ERROR][0a01796d-84c8-451b-998c-ef06e6a3a314] LogInterceptor postHandle - modelAndView [ModelAndView [view="error-page/500"; model={}]]
+[/error-page/500][ERROR][0a01796d-84c8-451b-998c-ef06e6a3a314] LogInterceptor afterCompletion
+[/error-page/500][ERROR][0a01796d-84c8-451b-998c-ef06e6a3a314] LogFilter doFilter - END
+```
+
+#### 흐름
+
+```
+1. WAS(/error-ex, dispatchType=REQUEST) -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러
+2. WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(예외발생)
+3. WAS 오류 페이지 확인
+4. WAS(/error-page/500, dispatchType=ERROR) -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러(/error-page/500) -> View
+```
+
 ## 스프링 부트 - 오류 페이지 1
 
 ## 스프링 부트 - 오류 페이지 2

@@ -1,5 +1,6 @@
 package hello.springcoremvc28.filter;
 
+import hello.springcoremvc28.consts.Consts;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -24,13 +25,16 @@ public class LogFilter implements Filter {
     ) throws IOException, ServletException {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         String requestURI = httpRequest.getRequestURI();
+        DispatcherType dispatcherType = request.getDispatcherType();
+
         String uuid = UUID.randomUUID().toString();
+        request.setAttribute(Consts.logId, uuid);
 
         try {
-            log.info("[{}][{}][{}] LogFilter doFilter - START", requestURI, request.getDispatcherType(), uuid);
+            log.info("[{}][{}][{}] LogFilter doFilter - START", requestURI, dispatcherType, uuid);
             chain.doFilter(request, response);
         } finally {
-            log.info("[{}][{}][{}] LogFilter doFilter - END", requestURI, request.getDispatcherType(), uuid);
+            log.info("[{}][{}][{}] LogFilter doFilter - END", requestURI, dispatcherType, uuid);
         }
     }
 

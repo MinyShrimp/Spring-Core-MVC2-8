@@ -15,19 +15,19 @@ public class ErrorPageController {
             HttpServletRequest req
     ) {
         // 예외
-        log.info("ERROR_EXCEPTION: ex = {}", req.getAttribute(RequestDispatcher.ERROR_EXCEPTION));
+        log.info("ERROR_EXCEPTION: ", req.getAttribute(RequestDispatcher.ERROR_EXCEPTION));
         // 예외 타입
-        log.info("ERROR_EXCEPTION_TYPE: {}", req.getAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE));
+        log.info("ERROR_EXCEPTION_TYPE: [{}]", req.getAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE));
         // 예외 메세지
-        log.info("ERROR_MESSAGE: {}", req.getAttribute(RequestDispatcher.ERROR_MESSAGE));
+        log.info("ERROR_MESSAGE: [{}]", req.getAttribute(RequestDispatcher.ERROR_MESSAGE));
         // 오류가 발생한 클라이언트 요청 URI
-        log.info("ERROR_REQUEST_URI: {}", req.getAttribute(RequestDispatcher.ERROR_REQUEST_URI));
+        log.info("ERROR_REQUEST_URI: [{}]", req.getAttribute(RequestDispatcher.ERROR_REQUEST_URI));
         // 오류가 발생한 서블릿 이름
-        log.info("ERROR_SERVLET_NAME: {}", req.getAttribute(RequestDispatcher.ERROR_SERVLET_NAME));
+        log.info("ERROR_SERVLET_NAME: [{}]", req.getAttribute(RequestDispatcher.ERROR_SERVLET_NAME));
         // 오류가 발생한 HTTP 상태 코드
-        log.info("ERROR_STATUS_CODE: {}", req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE));
+        log.info("ERROR_STATUS_CODE: [{}]", req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE));
 
-        log.info("dispatcherType: {}", req.getDispatcherType());
+        log.info("dispatcherType: [{}]", req.getDispatcherType());
     }
 
     @RequestMapping("/404")

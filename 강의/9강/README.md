@@ -1316,4 +1316,109 @@ public ModelAndView ex(ViewException e) {
 
 ## @ControllerAdvice
 
-## 정리
+`@ExceptionHandler`를 사용해서 예외를 깔끔하게 처리할 수 있게 되었지만,
+정상 코드와 예외 처리 코드가 하나의 컨트롤러에 섞여 있다.
+
+`@ControllerAdvice`또는 `@RestControllerAdvice`를 사용하면 둘을 분리할 수 있다.
+
+### 예제코드
+
+#### ApiExceptionV2Controller
+
+```java
+@Slf4j
+@RestController
+@RequestMapping("/api/2")
+public class ApiExceptionV2Controller {
+    @GetMapping("/members/{id}")
+    public MemberDto getMember(
+            @PathVariable String id
+    ) {
+        switch (id) {
+            case "ex" -> throw new RuntimeException("잘못된 사용자");
+            case "bad" -> throw new IllegalArgumentException("잘못된 입력 값");
+            case "user-ex" -> throw new UserException("사용자 오류");
+        }
+        return new MemberDto(id, "hello " + id);
+    }
+}
+```
+
+#### ExControllerAdvice
+
+```java
+@Slf4j
+@RestControllerAdvice
+public class ExControllerAdvice {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ErrorResult illegalExHandler(IllegalArgumentException e) {
+        log.error("illegalExHandler call: {}", e.toString());
+        return new ErrorResult("BAD", e.getMessage());
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ErrorResult> userExHandler(UserException e) {
+        log.error("userExHandler call: {}", e.toString());
+        ErrorResult result = new ErrorResult("USER-EX", e.getMessage());
+        return new ResponseEntity<ErrorResult>(result, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler
+    public ErrorResult exHandler(Exception e) {
+        log.error("exHandler call: {}", e.toString());
+        return new ErrorResult("EX", e.getMessage());
+    }
+}
+```
+
+#### 결과
+
+![img_14.png](img_14.png)
+
+### @ControllerAdvice
+
+* `@ControllerAdvice`는 대상으로 지정한 여러 컨트롤러에 `@ExceptionHandler`, `@InitBinder`기능을 부여해주는 역할을 한다.
+* `@ControllerAdvice`에 대상을 지정하지 않으면 모든 컨트롤러에 적용된다. (글로벌 적용)
+* `@RestControllerAdvice`는 `@ControllerAdvice`와 같고, `@ResponseBody`가 추가되어 있다.
+    * `@Controller`와 `@RestController`의 차이와 같다.
+
+### 대상 컨트롤러 지정 방법
+
+```java
+/**
+ * 특정 애노테이션이 있는 컨트롤러
+ * - @RestController
+ */
+@ControllerAdvice(annotations = RestController.class)
+public class ExampleAdvice1 {}
+
+/**
+ * 특정 패키지
+ * - org.example.controllers 패키지
+ */
+@ControllerAdvice("org.example.controllers")
+public class ExampleAdvice2 {}
+
+/**
+ * 특정 클래스
+ */
+@ControllerAdvice(
+        assignableTypes = {
+                ControllerInterface.class,
+                AbstractController.class
+        }
+)
+public class ExampleAdvice3 {}
+```
+
+* [공식 문서](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-ann-controller-advice)
+
+스프링 공식 문서 예제에서 보는 것 처럼 **특정 애노테이션이 있는 컨트롤러**를 지정할 수 있고, **특정 패키지**를 직접 지정할 수도 있다.
+패키지 지정의 경우 해당 패키지와 그 하위에 있는 컨트롤러가 대상이 된다. 그리고 **특정 클래스**를 지정할 수도 있다.
+
+대상 컨트롤러 지정을 생략하면 모든 컨트롤러에 적용된다.
+
+### 정리
+
+`@ExceptionHandler`와 `@ControllerAdvice`를 조합하면 예외를 깔끔하게 해결할 수 있다

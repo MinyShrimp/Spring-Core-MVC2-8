@@ -813,6 +813,197 @@ UserException resolver to 400
 
 ## 스프링이 제공하는 ExceptionResolver 1
 
+스프링 부트가 기본으로 제공하는 `ExceptionResolver`는 다음과 같다.
+
+### `HandlerExceptionResolverComposite`
+
+#### 등록 순서
+
+1. `ExceptionHandlerExceptionResolver`
+2. `ResponseStatusExceptionResolver`
+3. `DefaultHandlerExceptionResolver`
+
+#### ExceptionHandlerExceptionResolver
+
+- `@ExceptionHandler`을 처리한다.
+- API 예외 처리는 대부분 이 기능으로 해결한다.
+
+"스프링이 제공하는 ExceptionResolver 2"에서 더 자세히 설명한다.
+
+#### ResponseStatusExceptionResolver
+
+- HTTP 상태 코드를 지정해준다.
+    - 예) `@ResponseStatus(value = HttpStatus.NOT_FOUND)`
+
+#### DefaultHandlerExceptionResolver
+
+- 스프링 내부 기본 예외를 처리한다.
+- 우선 순위가 가장 낮다.
+- 지금까지 알아봤던 내용이 이것이다.
+
+### ResponseStatusExceptionResolver
+
+- `@ResponseStatus` 가 달려있는 예외
+- `ResponseStatusException` 예외
+
+### @ResponseStatus
+
+#### BadRequestException
+
+```java
+@ResponseStatus(
+        code = HttpStatus.BAD_REQUEST,
+        reason = "잘못된 요청 오류"
+)
+public class BadRequestException extends RuntimeException { }
+```
+
+`BadRequestException`예외가 컨트롤러 밖으로 넘어가면
+`ResponseStatusExceptionResolver`예외가 해당 애노테이션을 확인해서
+오류 코드를 `HttpStatus.BAD_REQUEST (400)`으로 변경하고, 메시지도 담는다.
+
+`ResponseStatusExceptionResolver`코드를 확인해보면 결국 `response.sendError(statusCode, resolvedReason)`를 호출하는 것을 확인할 수 있다.
+
+`sendError(400)`를 호출했기 때문에 **WAS에서 다시 오류 페이지(`/error`)를 내부 요청한다**
+
+#### ApiExceptionController - 추가
+
+```java
+@Slf4j
+@RestController
+public class ApiExceptionController {
+    @GetMapping("/api/response-status-ex1")
+    public String responseStatusEx1() {
+        throw new BadRequestException();
+    }
+}
+```
+
+### 결과
+
+#### Client
+
+![img_11.png](img_11.png)
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/response-status-ex1?message=
+Accept-Header: */*
+
+###################################
+# RESPONSE
+###################################
+{
+    "timestamp": "2023-02-17T08:31:17.485+00:00",
+    "status": 400,
+    "error": "Bad Request",
+    "exception": "hello.springcoremvc28.exception.BadRequestException",
+    "message": "잘못된 요청 오류",
+    "path": "/api/response-status-ex1"
+}
+```
+
+#### Server Log
+
+```
+###################################
+# GET /api/members/user-ex
+###################################
+[/api/response-status-ex1][REQUEST][83b2b430-aa10-417f-92a6-aa99d435a639] LogFilter doFilter - START
+[/api/response-status-ex1][REQUEST][83b2b430-aa10-417f-92a6-aa99d435a639] LogInterceptor preHandle - handler [hello.springcoremvc28.api.ApiExceptionController#responseStatusEx1()]
+[/api/response-status-ex1][REQUEST][83b2b430-aa10-417f-92a6-aa99d435a639] LogInterceptor afterCompletion
+[/api/response-status-ex1][REQUEST][83b2b430-aa10-417f-92a6-aa99d435a639] LogFilter doFilter - END
+
+###################################
+# /error
+###################################
+[/error][ERROR][9cb32fad-5e7f-4754-afa0-95d717ebd1fc] LogFilter doFilter - START
+[/error][ERROR][9cb32fad-5e7f-4754-afa0-95d717ebd1fc] LogFilter doFilter - END
+```
+
+### 메시지 기능
+
+`reason`을 `MessageSource`에서 찾는 기능도 제공한다.
+
+#### BadRequestException
+
+```java
+@ResponseStatus(
+        code = HttpStatus.BAD_REQUEST,
+        // reason = "잘못된 요청 오류"
+        reason = "error.bad"
+)
+public class BadRequestException extends RuntimeException {}
+```
+
+#### messages.properties
+
+```properties
+error.bad = 잘못된 요청 오류입니다. 메시지 사용.
+```
+
+#### 결과
+
+```
+{
+    "timestamp": "2023-02-17T08:39:13.247+00:00",
+    "status": 400,
+    "error": "Bad Request",
+    "exception": "hello.springcoremvc28.exception.BadRequestException",
+    "message": "잘못된 요청 오류입니다. 메시지 사용.",
+    "path": "/api/response-status-ex1"
+}
+```
+
+### ResponseStatusException
+
+`@ResponseStatus`는 개발자가 직접 변경할 수 없는 예외에는 적용할 수 없다.
+(애노테이션을 직접 넣어야 하는데, 내가 코드를 수정할 수 없는 라이브러리의 예외 코드 같은 곳에는 적용할 수 없다.)
+
+추가로 애노테이션을 사용하기 때문에 조건에 따라 동적으로 변경하는 것도 어렵다.
+이때는 `ResponseStatusException`예외를 사용하면 된다.
+
+#### ApiExceptionController - 추가
+
+```java
+@Slf4j
+@RestController("/api")
+public class ApiExceptionController {
+
+    @GetMapping("/response-status-ex2")
+    public String responseStatusEx2() {
+        throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "error.bad",
+                new IllegalArgumentException()
+        );
+    }
+}
+```
+
+### 결과
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/response-status-ex2?message=
+Accept-Header: */*
+
+###################################
+# RESPONSE
+###################################
+{
+    "timestamp": "2023-02-17T08:46:30.119+00:00",
+    "status": 404,
+    "error": "Not Found",
+    "message": "No message available",
+    "path": "/api/response-status-ex2"
+}
+```
+
 ## 스프링이 제공하는 ExceptionResolver 2
 
 ## @ExceptionHandler

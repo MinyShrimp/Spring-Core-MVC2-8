@@ -1157,9 +1157,9 @@ API 응답을 위해서 `HttpServletResponse`에 직접 응답 데이터를 넣�
 #### ErrorResultDto
 
 ```java
-@Setter
+@Getter
 @RequiredArgsConstructor
-public class ErrorResultDto {
+public class ErrorResult {
     private final String code;
     private final String message;
 }
@@ -1175,22 +1175,22 @@ public class ApiExceptionV2Controller {
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ExceptionHandler(IllegalArgumentException.class)
-    public ErrorResultDto illegalExHandler(IllegalArgumentException e) {
+    public ErrorResult illegalExHandler(IllegalArgumentException e) {
         log.error("illegalExHandler call: {}", e.toString());
-        return new ErrorResultDto("BAD", e.getMessage());
+        return new ErrorResult("BAD", e.getMessage());
     }
 
     @ExceptionHandler
-    public ResponseEntity<ErrorResultDto> userExHandler(UserException e) {
+    public ResponseEntity<ErrorResult> userExHandler(UserException e) {
         log.error("userExHandler call: {}", e.toString());
-        ErrorResultDto result = new ErrorResultDto("USER-EX", e.getMessage());
-        return new ResponseEntity<ErrorResultDto>(result, HttpStatus.BAD_REQUEST);
+        ErrorResult result = new ErrorResult("USER-EX", e.getMessage());
+        return new ResponseEntity<ErrorResult>(result, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler
-    public ErrorResultDto exHandler(Exception e) {
+    public ErrorResult exHandler(Exception e) {
         log.error("exHandler call: {}", e.toString());
-        return new ErrorResultDto("EX", e.getMessage());
+        return new ErrorResult("EX", e.getMessage());
     }
 
     @GetMapping("/members/{id}")

@@ -1,8 +1,8 @@
 package hello.springcoremvc28.api;
 
-import hello.springcoremvc28.dto.ErrorResultDto;
 import hello.springcoremvc28.dto.MemberDto;
 import hello.springcoremvc28.exception.UserException;
+import hello.springcoremvc28.exhandler.ErrorResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,22 +15,22 @@ public class ApiExceptionV2Controller {
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ExceptionHandler(IllegalArgumentException.class)
-    public ErrorResultDto illegalExHandler(IllegalArgumentException e) {
+    public ErrorResult illegalExHandler(IllegalArgumentException e) {
         log.error("illegalExHandler call: {}", e.toString());
-        return new ErrorResultDto("BAD", e.getMessage());
+        return new ErrorResult("BAD", e.getMessage());
     }
 
     @ExceptionHandler
-    public ResponseEntity<ErrorResultDto> userExHandler(UserException e) {
+    public ResponseEntity<ErrorResult> userExHandler(UserException e) {
         log.error("userExHandler call: {}", e.toString());
-        ErrorResultDto result = new ErrorResultDto("USER-EX", e.getMessage());
-        return new ResponseEntity<ErrorResultDto>(result, HttpStatus.BAD_REQUEST);
+        ErrorResult result = new ErrorResult("USER-EX", e.getMessage());
+        return new ResponseEntity<ErrorResult>(result, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler
-    public ErrorResultDto exHandler(Exception e) {
+    public ErrorResult exHandler(Exception e) {
         log.error("exHandler call: {}", e.toString());
-        return new ErrorResultDto("EX", e.getMessage());
+        return new ErrorResult("EX", e.getMessage());
     }
 
     @GetMapping("/members/{id}")

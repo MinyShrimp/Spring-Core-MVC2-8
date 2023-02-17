@@ -968,7 +968,8 @@ error.bad = 잘못된 요청 오류입니다. 메시지 사용.
 
 ```java
 @Slf4j
-@RestController("/api")
+@RestController
+@RequestMapping("/api")
 public class ApiExceptionController {
 
     @GetMapping("/response-status-ex2")
@@ -1005,6 +1006,116 @@ Accept-Header: */*
 ```
 
 ## 스프링이 제공하는 ExceptionResolver 2
+
+### DefaultHandlerExceptionResolver
+
+`DefaultHandlerExceptionResolver`는 스프링 내부에서 발생하는 스프링 예외를 해결한다.
+
+대표적으로 파라미터 바인딩 시점에 타입이 맞지 않으면 내부에서 `TypeMismatchException`이 발생하는데,
+이 경우 예외가 발생했기 때문에 그냥 두면 서블릿 컨테이너까지 오류가 올라가고, 결과적으로 500 오류가 발생한다.
+
+그런데 파라미터 바인딩은 대부분 클라이언트가 HTTP 요청 정보를 잘못 호출해서 발생하는 문제이다.
+HTTP 에서는 이런 경우 HTTP 상태 코드 400을 사용하도록 되어 있다.
+
+`DefaultHandlerExceptionResolver`는 이것을 500 오류가 아니라 HTTP 상태 코드 400 오류로 변경한다.
+스프링 내부 오류를 어떻게 처리할지 수 많은 내용이 정의되어 있다.
+
+#### 코드 확인
+
+```java
+public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionResolver {
+    // ...
+    
+    protected ModelAndView handleTypeMismatch(
+            TypeMismatchException ex,
+            HttpServletRequest request, 
+            HttpServletResponse response, 
+            @Nullable Object handler
+    ) throws IOException {
+
+        response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        return new ModelAndView();
+    }
+    
+    // ...
+}
+
+```
+
+결국 `response.sendError()`를 통해서 문제를 해결한다.
+`sendError(400)`를 호출했기 때문에 WAS 에서 다시 오류 페이지(`/error`)를 내부 요청한다.
+
+### ApiExceptionController - 추가
+
+```java
+@Slf4j
+@RestController
+@RequestMapping("/api")
+public class ApiExceptionController {
+    @GetMapping("/default-handler-ex")
+    public String defaultException(
+            @RequestParam Integer data
+    ) {
+        log.info("GET /api/default-handler-ex data = [{}]", data);
+        return Integer.toString(data);
+    }
+}
+```
+
+### 결과
+
+#### Client
+
+![img_12.png](img_12.png)
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/default-handler-ex?data=hello
+Accept-Header: */*
+
+###################################
+# RESPONSE
+###################################
+{
+    "timestamp": "2023-02-17T09:17:10.327+00:00",
+    "status": 400,
+    "error": "Bad Request",
+    "exception": "org.springframework.web.method.annotation.MethodArgumentTypeMismatchException",
+    "path": "/api/default-handler-ex"
+}
+```
+
+#### Server Log
+
+```
+###################################
+# GET /api/default-handler-ex?data=hello
+###################################
+[/api/default-handler-ex][REQUEST][dfab978f-9b4a-4555-b834-2ba9be33ebcc] LogFilter doFilter - START
+[/api/default-handler-ex][REQUEST][dfab978f-9b4a-4555-b834-2ba9be33ebcc] LogInterceptor preHandle - handler [hello.springcoremvc28.api.ApiExceptionController#defaultException(Integer)]
+Resolved [org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Failed to convert value of type 'java.lang.String' to required type 'java.lang.Integer'; For input string: "hello"]
+[/api/default-handler-ex][REQUEST][dfab978f-9b4a-4555-b834-2ba9be33ebcc] LogInterceptor afterCompletion
+[/api/default-handler-ex][REQUEST][dfab978f-9b4a-4555-b834-2ba9be33ebcc] LogFilter doFilter - END
+
+###################################
+# /error
+###################################
+[/error][ERROR][2a2b5b91-06da-42a8-9908-b91af9ad99c6] LogFilter doFilter - START
+[/error][ERROR][2a2b5b91-06da-42a8-9908-b91af9ad99c6] LogFilter doFilter - END
+```
+
+### 정리
+
+지금까지 HTTP 상태 코드를 변경하고, 스프링 내부 예외의 상태코드를 변경하는 기능도 알아보았다.
+
+그런데 `HandlerExceptionResolver`를 직접 사용하기는 복잡하다.
+API 오류 응답의 경우 `response`에 직접 데이터를 넣어야 해서 매우 불편하고 번거롭다.
+`ModelAndView`를 반환해야 하는 것도 API에는 잘 맞지 않는다.
+
+스프링은 이 문제를 해결하기 위해 `@ExceptionHandler`라는 매우 혁신적인 예외 처리 기능을 제공한다.
+그것이 아직 소개하지 않은 `ExceptionHandlerExceptionResolver`이다.
 
 ## @ExceptionHandler
 

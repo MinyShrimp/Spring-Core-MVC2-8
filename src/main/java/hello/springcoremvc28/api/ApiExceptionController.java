@@ -5,10 +5,7 @@ import hello.springcoremvc28.exception.BadRequestException;
 import hello.springcoremvc28.exception.UserException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
@@ -41,5 +38,13 @@ public class ApiExceptionController {
                 "error.bad",
                 new IllegalArgumentException()
         );
+    }
+
+    @GetMapping("/default-handler-ex")
+    public String defaultException(
+            @RequestParam Integer data
+    ) {
+        log.info("GET /api/default-handler-ex data = [{}]", data);
+        return Integer.toString(data);
     }
 }

@@ -760,4 +760,155 @@ dispatcherType: [ERROR]
 
 ## 스프링 부트 - 오류 페이지 2
 
+### BasicErrorController 기본 정보들
+
+#### Model
+
+`BasicErrorController`컨트롤러는 다음 정보를 `model`에 담아서 뷰에 전달한다.
+뷰 템플릿은 이 값을 활용해서 출력할 수 있다
+
+```
+* timestamp: Fri Feb 05 00:00:00 KST 2021
+* status: 400
+* error: Bad Request
+* exception: org.springframework.validation.BindException
+* trace: 예외 trace
+* message: Validation failed for object='data'. Error count: 1
+* errors: Errors(BindingResult)
+* path: 클라이언트 요청 경로 (`/hello`)
+* ...
+```
+
+#### 500.html
+
+```html
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+</head>
+<body>
+<div class="container" style="max-width: 600px">
+    <div class="py-5 text-center">
+        <h2>500 오류 화면 스프링 부트 제공</h2>
+    </div>
+    <div>
+        <p>오류 화면 입니다.</p>
+    </div>
+    <ul>
+        <li>오류 정보</li>
+        <ul>
+            <li th:text="|timestamp: ${timestamp}|"></li>
+            <li th:text="|path: ${path}|"></li>
+            <li th:text="|status: ${status}|"></li>
+            <li th:text="|message: ${message}|"></li>
+            <li th:text="|error: ${error}|"></li>
+            <li th:text="|exception: ${exception}|"></li>
+            <li th:text="|errors: ${errors}|"></li>
+            <li th:text="|trace: ${trace}|"></li>
+        </ul>
+        </li>
+    </ul>
+    <hr class="my-4">
+</div> <!-- /container -->
+</body>
+</html>
+```
+
+#### 결과
+
+![img_5.png](img_5.png)
+
+오류 관련 내부 정보들을 고객에게 노출하는 것은 좋지 않다.
+고객이 해당 정보를 읽어도 혼란만 더해지고, 보안상 문제가 될 수도 있다.
+
+그래서 `BasicErrorController` 오류 컨트롤러에서 다음 오류 정보를 `model`에 포함할지 여부를 선택할 수 있다.
+
+### application.properties
+
+```properties
+# Exception 포함 여부. (true, false)
+# Default: false
+server.error.include-exception = false
+
+# message 포함 여부. (never, always, on_param)
+# Default: never
+server.error.include-message = never
+
+# stacktrace 포함 여부. (never, always, on_param)
+# Default: never
+server.error.include-stacktrace = never
+
+# errors 포함 여부. (never, always, on_param)
+# Default: never
+server.error.include-binding-errors = never
+```
+
+기본 값이 `never`인 부분은 다음 3가지 옵션을 사용할 수 있다.
+
+* `never`: 사용하지 않음
+* `always`: 항상 사용
+* `on_param`: 파라미터가 있을 때 사용
+
+`on_param`은 파라미터가 있으면 해당 정보를 노출한다.
+디버그 시 문제를 확인하기 위해 사용할 수 있다.
+
+그런데 이 부분도 개발 서버에서 사용할 수 있지만, 운영 서버에서는 권장하지 않는다.
+
+`on_param`으로 설정하고 다음과 같이 HTTP 요청시 파라미터를 전달하면 해당 정보들이 `model`에 담겨서 뷰 템플릿에서 출력된다.
+
+#### 변경해보자.
+
+```properties
+# Exception 포함 여부. (true, false)
+server.error.include-exception = true
+
+# message 포함 여부. (never, always, on_param)
+server.error.include-message = on_param
+
+# stacktrace 포함 여부. (never, always, on_param)
+server.error.include-stacktrace = on_param
+
+# errors 포함 여부. (never, always, on_param)
+server.error.include-binding-errors = on_param
+```
+
+```
+/error-ex?message=&errors=&trace=
+```
+
+![img_6.png](img_6.png)
+
+### 스프링 부트 오류 관련 옵션 - 추가
+
+```properties
+# 기본 스프링 부트 whitelabel 오류 페이지 적용. (true, false)
+# Default: true
+server.error.whitelabel.enabled = true
+
+# 오류 페이지 경로
+# 스프링이 자동 등록하는 "서블릿 글로벌 오류 페이지 경로"와 "BasicErrorController" 오류 컨트롤러 경로에 함께 사용된다.
+# Default: /error
+server.error.path = /error
+```
+
+* `${server.error.path:${error.path:/error}}`
+    * `application.properties` 파일에 `server.error.path`를 찾는다.
+    * 없으면, `error.path`를 찾는다.
+    * 그래도 없으면, `/error`를 사용한다.
+
+### 확장 포인트
+
+에러 공통 처리 컨트롤러의 기능을 변경하고 싶으면,
+
+* `ErrorController` 인터페이스를 상속 받아서 구현하거나
+* `BasicErrorController` 상속 받아서 기능을 추가하면 된다.
+
+### 주의!!!
+
+> **주의!!!** <br>
+> 실무에서는 이것들을 노출하면 안된다! <br>
+> 사용자에게는 이쁜 오류 화면과 고객이 이해할 수 있는 간단한 오류 메시지를 보여주고
+> 오류는 서버에 로그로 남겨서 로그로 확인해야 한다.
+
 ## 정리

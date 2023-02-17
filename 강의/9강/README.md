@@ -251,6 +251,109 @@ GET /error-page/500: application/json
 
 ## 스프링 부트 기본 오류 처리
 
+API 예외 처리도 스프링 부트가 제공하는 기본 오류 방식을 사용할 수 있다.
+
+스프링 부트가 제공하는 `BasicErrorController`코드를 보자.
+
+#### WebServerCustomizer 주석 추가
+
+```java
+//@Component
+public class WebServerCustomizer implements WebServerFactoryCustomizer<ConfigurableWebServerFactory> { ... }
+```
+
+### BasicErrorController
+
+```java
+@Controller
+@RequestMapping("${server.error.path:${error.path:/error}}")
+public class BasicErrorController extends AbstractErrorController {
+
+    /**
+     * Accept-Header: text/html
+     * @returns View Templates
+     */
+    @RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+    public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) { ... }
+    
+    /**
+     * Accept_Header: 그 외
+     * @returns JSON 데이터
+     */
+    @RequestMapping
+    public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) { ... } 
+}
+```
+
+### application.properties
+
+```properties
+# 기본 스프링 부트 whitelabel 오류 페이지 적용. (true, false)
+# Default: true
+server.error.whitelabel.enabled = true
+
+# 오류 페이지 경로
+# 스프링이 자동 등록하는 "서블릿 글로벌 오류 페이지 경로"와 "BasicErrorController" 오류 컨트롤러 경로에 함께 사용된다.
+# Default: /error
+server.error.path = /error
+
+# Exception 포함 여부. (true, false)
+server.error.include-exception = true
+
+# message 포함 여부. (never, always, on_param)
+server.error.include-message = on_param
+
+# stacktrace 포함 여부. (never, always, on_param)
+server.error.include-stacktrace = on_param
+
+# errors 포함 여부. (never, always, on_param)
+server.error.include-binding-errors = on_param
+```
+
+### 결과
+
+#### Client (Postman)
+
+![img_3.png](img_3.png)
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/members/ex?message=&trace=&errors=
+Accept-Header: */*
+
+###################################
+# RESPONSE
+###################################
+{
+    "timestamp": "2023-02-17T06:48:41.953+00:00",
+    "status": 500,
+    "error": "Internal Server Error",
+    "exception": "java.lang.RuntimeException",
+    "trace": "java.lang.RuntimeException: 잘 못 된 사용자\n\tat hello....",
+    "message": "잘 못 된 사용자",
+    "path": "/api/members/ex"
+}
+```
+
+#### Client (브라우저)
+
+![img_4.png](img_4.png)
+
+```
+###################################
+# REQUEST
+###################################
+GET /api/members/ex?message=&trace=&errors=
+Accept-Header: */*
+
+###################################
+# RESPONSE
+###################################
+< src/main/resources/templates/error/500.html >
+```
+
 ## HandlerExceptionResolver 시작
 
 ## HandlerExceptionResolver 활용

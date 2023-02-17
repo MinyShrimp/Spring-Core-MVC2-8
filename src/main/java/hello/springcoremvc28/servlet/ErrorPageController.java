@@ -27,7 +27,7 @@ public class ErrorPageController {
         // 오류가 발생한 HTTP 상태 코드
         log.info("ERROR_STATUS_CODE: {}", req.getAttribute(RequestDispatcher.ERROR_STATUS_CODE));
 
-        log.info("dispatchType: {}", req.getDispatcherType());
+        log.info("dispatcherType: {}", req.getDispatcherType());
     }
 
     @RequestMapping("/404")

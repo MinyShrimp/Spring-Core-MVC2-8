@@ -388,6 +388,189 @@ public class ErrorPageController {
 
 ## 서블릿 예외 처리 - 필터
 
+### 목표
+
+예외 처리에 따른 **필터**와 **인터셉터**, 그리고 서블릿이 제공하는 `DispatcherType`이해하기
+
+### 예외 발생과 오류 페이지 요청 흐름
+
+```
+1. WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(예외발생)
+2. WAS `/error-page/500` 다시 요청 -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러(/error-page/500) -> View
+```
+
+오류가 발생하면 오퓨 페이지를 출력하기 위해 WAS 내부에서 다시 한번 호출이 발생한다.
+이때 필터, 서블릿, 인터셉터도 모두 다시 호출된다.
+그런데, 로그인 인증 체크 같은 경우를 생해보면, 이미 한번 필터나, 인터셉터에서 로그인 체크를 완료했다.
+따라서 서버 내부에서 오류 페이지를 호출한다고 해서 해당 필터나 인터셉트가 한번 더 호출되는 것은 매우 비효율적이다.
+
+결국 클라이언트로 부터 발생한 정상 요청인지, 아니면 오류 페이지를 출력하기 위한 내부 요청인지 구분할 수 있어야 한다.
+서블릿은 이런 문제를 해결하기 위해 `DispatcherType` 이라는 추가 정보를 제공한다.
+
+### DispatcherType
+
+#### 이전 시간에서...
+
+```java
+// 정상: dispatcherType: REQUEST
+// 오류: dispatcherType: ERROR
+log.info("dispatcherType: {}", req.getDispatcherType());
+```
+
+#### 원형
+
+```java
+package jakarta.servlet;
+
+public enum DispatcherType {
+    // 다른 서블릿이나 JSP를 호출할 때
+    // RequestDispatcher.forward(request, response);
+    FORWARD,
+    
+    // 다른 서블릿이나 JSP의 결과를 포함할 때
+    // RequestDispatcher.include(request, response);
+    INCLUDE,
+    
+    // 클라이언트 요청
+    // GET /info
+    REQUEST,
+    
+    // 비동기 호출
+    ASYNC,
+    
+    // 오류 요청
+    // throw
+    // response.sendError()
+    ERROR
+}
+```
+
+|Type|설명|예시|
+|-|-|-|
+|`REQUEST`|클라이언트 요청|`GET /info`|
+|`ERROR`|오류 요청|`response.sendError()`|
+|`FORWARD`|다른 서블릿이나 JSP를 호출할 때|`RequestDispatcher.forward(request, response)`|
+|`INCLUDE`|다른 서블릿이나 JSP의 결과를 포함할 때|`RequestDispatcher.include(request, response)`|
+|`ASYNC`|서블릿 비동기 호출| - |
+
+### LogFilter
+
+```java
+@Slf4j
+public class LogFilter implements Filter {
+    @Override
+    public void init(
+            FilterConfig filterConfig
+    ) throws ServletException {
+        log.info("LogFilter init");
+    }
+
+    @Override
+    public void doFilter(
+            ServletRequest request,
+            ServletResponse response,
+            FilterChain chain
+    ) throws IOException, ServletException {
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        String requestURI = httpRequest.getRequestURI();
+        String uuid = UUID.randomUUID().toString();
+
+        try {
+            log.info("[{}][{}][{}] LogFilter doFilter - START", requestURI, request.getDispatcherType(), uuid);
+            chain.doFilter(request, response);
+        } finally {
+            log.info("[{}][{}][{}] LogFilter doFilter - END", requestURI, request.getDispatcherType(), uuid);
+        }
+    }
+
+    @Override
+    public void destroy() {
+        log.info("LogFilter destroy");
+    }
+}
+```
+
+### FilterConfig
+
+```java
+@Configuration
+public class FilterConfig implements WebMvcConfigurer {
+    @Bean
+    public FilterRegistrationBean logFilter() {
+        FilterRegistrationBean<Filter> filterRegistrationBean = new FilterRegistrationBean<>();
+
+        filterRegistrationBean.setFilter(new LogFilter());
+        filterRegistrationBean.setOrder(1);
+        filterRegistrationBean.addUrlPatterns("/*");
+        
+        // 설정을 하지 않으면, 기본값으로 REQUEST만 받는다.
+        filterRegistrationBean.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ERROR);
+
+        return filterRegistrationBean;
+    }
+}
+```
+
+#### setDispatcherTypes
+
+```java
+// 기본값, 사용자의 요청만 적용.
+filterRegistrationBean.setDispatcherTypes(DispatcherType.REQUEST);
+
+// 오류만 적용.
+filterRegistrationBean.setDispatcherTypes(DispatcherType.ERROR);
+
+// 사용자의 요청 + 오류 둘 다 적용.
+filterRegistrationBean.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ERROR);
+```
+
+이렇게 두 가지를 모두 넣으면 클라이언트 요청은 물론이고, 오류 페이지 요청에서도 필터가 호출된다.
+
+아무것도 넣지 않으면 기본값이 `DispatcherType.REQUEST`이다.
+특별히 오류페이지 경로도 필터를 적용할 것이 아니면, 기본 값을 그대로 사용하면 된다.
+
+### 결과
+
+```
+// 클라이언트 요청: GET / 
+[/error-404][REQUEST][ee90ec0d-5c82-46cf-93ae-28f1df087eb1] LogFilter doFilter - START
+[/error-404][REQUEST][ee90ec0d-5c82-46cf-93ae-28f1df087eb1] LogFilter doFilter - END
+
+// 에러 발생 - 404 (HttpStatus.NOT_FOUND)
+[/error-page/404][ERROR][986fbec6-d37f-482a-9bbe-fb9b522a82d1] LogFilter doFilter - START
+GET /error-page/404
+ERROR_EXCEPTION: ex = null
+ERROR_EXCEPTION_TYPE: null
+ERROR_MESSAGE: 404 오류!
+ERROR_REQUEST_URI: /error-404
+ERROR_SERVLET_NAME: dispatcherServlet
+ERROR_STATUS_CODE: 404
+dispatchType: ERROR
+[/error-page/404][ERROR][986fbec6-d37f-482a-9bbe-fb9b522a82d1] LogFilter doFilter - END
+```
+
+### 추가 - WebFilter
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface WebFilter {
+    DispatcherType[] dispatcherTypes() default {DispatcherType.REQUEST};
+}
+```
+
+```java
+@WebFilter(
+    dispatcherTypes = {
+        DispatcherType.REQUEST,
+        DispatcherType.ERROR
+    }
+)
+```
+
+`@WebFilter` 애노테이션도 어떤 `DispatcherType`을 받을지 선택할 수 있는 파라미터를 제공한다.
+
 ## 서블릿 예외 처피 - 인터셉터
 
 ## 스프링 부트 - 오류 페이지 1

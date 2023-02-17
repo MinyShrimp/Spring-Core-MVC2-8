@@ -892,11 +892,6 @@ server.error.whitelabel.enabled = true
 server.error.path = /error
 ```
 
-* `${server.error.path:${error.path:/error}}`
-    * `application.properties` 파일에 `server.error.path`를 찾는다.
-    * 없으면, `error.path`를 찾는다.
-    * 그래도 없으면, `/error`를 사용한다.
-
 ### 확장 포인트
 
 에러 공통 처리 컨트롤러의 기능을 변경하고 싶으면,
@@ -911,4 +906,64 @@ server.error.path = /error
 > 사용자에게는 이쁜 오류 화면과 고객이 이해할 수 있는 간단한 오류 메시지를 보여주고
 > 오류는 서버에 로그로 남겨서 로그로 확인해야 한다.
 
-## 정리
+## 추가 정리
+
+### BasicErrorController
+
+```java
+@Controller
+@RequestMapping("${server.error.path:${error.path:/error}}")
+public class BasicErrorController extends AbstractErrorController { 
+    @RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+    public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+        HttpStatus status = getStatus(request);
+        Map<String, Object> model = Collections
+                .unmodifiableMap(getErrorAttributes(request, getErrorAttributeOptions(request, MediaType.TEXT_HTML)));
+        response.setStatus(status.value());
+        ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+        return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
+    }
+
+    @RequestMapping
+    public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) {
+        HttpStatus status = getStatus(request);
+        if (status == HttpStatus.NO_CONTENT) {
+            return new ResponseEntity<>(status);
+        }
+        Map<String, Object> body = getErrorAttributes(request, getErrorAttributeOptions(request, MediaType.ALL));
+        return new ResponseEntity<>(body, status);
+    }
+}
+```
+
+#### class BasicErrorController extends AbstractErrorController
+
+```java
+@Controller
+@RequestMapping("${server.error.path:${error.path:/error}}")
+public class BasicErrorController extends AbstractErrorController { ... }
+```
+
+`${server.error.path:${error.path:/error}}`
+
+* `application.properties` 파일에 `server.error.path`를 찾는다.
+* 없으면, `error.path`를 찾는다.
+* 그래도 없으면, `/error`를 사용한다.
+
+#### ModelAndView errorHtml()
+
+```java
+@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) { ... }
+```
+
+Accept-Header에 text/html이 포함된 경우에 `errorHtml()`에서 처리한다.
+
+#### ResponseEntity<Map<String, Object>> error()
+
+```java
+@RequestMapping
+public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) { ... }
+```
+
+그렇지않은 경우(API 요청), `error()`에서 `ResponseEntity(JSON)`로 리턴한다.

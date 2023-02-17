@@ -839,7 +839,6 @@ UserException resolver to 400
 
 - 스프링 내부 기본 예외를 처리한다.
 - 우선 순위가 가장 낮다.
-- 지금까지 알아봤던 내용이 이것이다.
 
 ### ResponseStatusExceptionResolver
 
@@ -999,7 +998,8 @@ Accept-Header: */*
     "timestamp": "2023-02-17T08:46:30.119+00:00",
     "status": 404,
     "error": "Not Found",
-    "message": "No message available",
+    "exception": "org.springframework.web.server.ResponseStatusException",
+    "message": "잘못된 요청 오류입니다. 메시지 사용.",
     "path": "/api/response-status-ex2"
 }
 ```

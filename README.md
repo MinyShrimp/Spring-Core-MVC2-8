@@ -8,6 +8,7 @@
     * https://github.com/MinyShrimp/Spring-Core-MVC2-2
     * https://github.com/MinyShrimp/Spring-Core-MVC2-6
     * https://github.com/MinyShrimp/Spring-Core-MVC2-8
+    * https://github.com/MinyShrimp/Spring-Core-MVC2-10
 
 ## [예외 처리와 오류 페이지](./강의/8강)
 

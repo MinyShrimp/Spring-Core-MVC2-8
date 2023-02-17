@@ -354,6 +354,13 @@ Accept-Header: */*
 < src/main/resources/templates/error/500.html >
 ```
 
+#### 참고 - Postman, 브라우저의 기본 설정
+
+| Name    | Accept-Header                    | Content-Type     |
+|---------|----------------------------------|------------------|
+| Postman | `*/*`                            | application/json |
+| Browser | text/html, application/xhtml, .. | None             |
+
 ## HandlerExceptionResolver 시작
 
 ## HandlerExceptionResolver 활용
